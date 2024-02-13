@@ -7,27 +7,26 @@ export default defineConfig({
   // site: 'https://stargazers.club',
   integrations: [
     starlight({
-      title: `Haku の ノット`,
+      title: `Haku の Portfolio`,
+      components: { Header: "./src/components/Header.astro" },
       social: {
-        github: "https://github.com/withastro/starlight",
+        github: "https://github.com/hakudevtw",
+        linkedin: "https://linkedin.com/in/柏岳-陳-34000a227",
       },
-      editLink: {
-        baseUrl: "https://github.com/withastro/starlight/edit/main/docs/",
-      },
+      lastUpdated: true,
+      pagination: false,
+      editLink: { baseUrl: "https://github.com/hakudevtw/my-blog/edit/main/notes/" },
+      customCss: ["./src/tailwind.css"],
       sidebar: [
         {
-          label: "Guides",
-          items: [
-            // Each item here is one entry in the navigation menu.
-            { label: "Example Guide", link: "/guides/example/" },
-          ],
+          label: "Intro",
+          link: "/notes/intro",
         },
         {
-          label: "Reference",
-          autogenerate: { directory: "reference" },
+          label: "WebDev",
+          autogenerate: { directory: "notes/WebDev" },
         },
       ],
-      customCss: ["./src/tailwind.css"],
     }),
     tailwind({ applyBaseStyles: false }),
   ],

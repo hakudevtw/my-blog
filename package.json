@@ -11,13 +11,13 @@
     "update": "pnpm dlx @astrojs/upgrade"
   },
   "dependencies": {
+    "@astrojs/check": "^0.5.3",
     "@astrojs/starlight": "^0.18.0",
     "@astrojs/starlight-tailwind": "^2.0.1",
     "@astrojs/tailwind": "^5.1.0",
-    "astro": "^4.3.4",
+    "astro": "^4.2.4",
     "sharp": "^0.32.5",
     "tailwindcss": "^3.4.1",
-    "@astrojs/check": "^0.5.3",
     "typescript": "^5.3.3"
   }
 }

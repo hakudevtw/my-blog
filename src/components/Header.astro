@@ -1,0 +1,33 @@
+---
+import type { Props } from "@astrojs/starlight/props";
+import SiteTitle from "@astrojs/starlight/components/SiteTitle.astro";
+// import Search from "@astrojs/starlight/components/Search.astro";
+import SocialIcons from "@astrojs/starlight/components/SocialIcons.astro";
+import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
+
+const LINKS = [{ name: "Notes", href: "/notes/intro" }];
+---
+
+<div class="flex">
+  <div class="flex gap-8">
+    <SiteTitle {...Astro.props} />
+    <nav class="flex items-center gap-4">
+      {
+        LINKS.map((link) => (
+          <a
+            class="no-underline text-accent-600 dark:text-accent-200 font-semibold"
+            href={link.href}
+          >
+            {link.name}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+
+  <div class="flex items-center gap-4 grow justify-end">
+    <SocialIcons {...Astro.props} />
+    <!-- <Search {...Astro.props} /> -->
+    <ThemeSelect {...Astro.props} />
+  </div>
+</div>
