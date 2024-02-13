@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "name": "Notes",
+      "path": "../src/content/docs/notes"
+    },
+    {
+      "name": "Root",
+      "path": "../"
+    }
+  ]
+}

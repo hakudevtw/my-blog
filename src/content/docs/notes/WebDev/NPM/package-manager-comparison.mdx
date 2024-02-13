@@ -1,0 +1,136 @@
+---
+title: Package Manager 比較
+description: JavaScript Package Manager 比較
+---
+
+:::note
+最近有出了許多新的如 Bun、LLRT 等等，等成熟後再來補充
+:::
+
+## Package Manager 是什麼？
+
+- 一套用來管理軟體的安裝、更新、移除的管理工具
+- 管理工具會將這些軟體統一存在某個地方，並讓多個使用者能共享、複製這些軟體
+- JavaScript 專案，常常會有許多檔案資源的相互依賴關係，需透過如 npm、yarn 做管理
+  - Node 預設用 NPM 做管理，但 NPM 少了一些比較進階的功能，在比較大型的專案中，
+    對於處理相依關係和軟體安裝等工作的效率較差
+  - Yarn 和 Pnpm 的出現就是為了解決上述的問題
+
+## 比較 NPM & Yarn & PNPM
+
+- **NPM** - 最初為了 Node.js 專案所開發的 JavaScript 管理工具，
+  讓開發者能輕易共享並引用對方寫好的 code 到自己的專案中
+- **Yarn** - 由 Facebook 所開發，可靠、安全、且效率不錯
+- **PNPM** - 建構在 NPM 上，簡化了 packages 安裝到專案的流程，讓其速度更快，
+  另外也提供了更多功能，讓他比 NPM 更強大
+
+### 1. 效能表現和硬體使用效率
+
+- 三者比較
+  - **NPM** - 相較之下，比 Yarn 和 PNPM 來的差一點
+  - **Yarn** - 和 NPM 使用相同的扁平化後的 node_modules，但速度更快，
+    在安裝 package 時，可以併行處理
+  - **PNPM** - 比 NPM 快上 3 倍，且效率比 NPM 更好，加上 cold & hot cache 也比 Yarn 來的快
+- NPM 和 Yarn 使用扁平化的 Dependency Tree (將專案的嵌套依賴關係解析並簡化成一個扁平的結構)
+  - 當你專案中有依賴關係時，這些依賴項可能還有它們自己的依賴項，從而形成一個樹狀結構，
+    每一層樹代表不同的套件及其依賴項。然而，深度嵌套的樹可能導致潛在問題，例如版本衝突或重複的依賴項
+  - 將依賴樹扁平化的過程涉及分析和解決這些問題，將所有依賴項調整到單一層次，消除重複並確保所有套件使用相容的版本，
+    這樣可以簡化依賴項的結構，更容易管理，並減少衝突的風險
+  - 壞處是因為巢狀的結構，同一個 package 會需要為了被重複依賴而重複拷貝很多次
+    ```shell
+    node_modules
+    └─ foo
+       ├─ index.js
+       ├─ package.json
+       └─ node_modules
+          └─ bar
+             ├─ index.js
+             └─ package.json
+    ```
+  - Yarn 會對重複的 package 從 Cache 中做拷貝
+- PNPM 採取另一種方式
+  - 不同於另外兩者，PNPM 沒有扁平化的 Dependency Tree，而是將 package dependencies 各自群組起來
+  - 使用共用的 Dependency Store，重複需要的只需鏈接到 Store 裡面的檔案就好，
+    因此相同版本的相同套件，不會被重複載入
+    ```shell
+    node_modules
+    ├─ foo -> .registry.npmjs.org/foo/1.0.0/node_modules/foo
+    └─ .registry.npmjs.org
+       ├─ foo/1.0.0/node_modules
+       |  ├─ bar -> ../../bar/2.0.0/node_modules/bar
+       |  └─ foo
+       |     ├─ index.js
+       |     └─ package.json
+       └─ bar/2.0.0/node_modules
+          └─ bar
+             ├─ index.js
+             └─ package.json
+    ```
+  - 這樣做也能省下大量的空間
+    :::info
+    NPM 當初設計時產生的 [Doppelgangers](https://rushjs.io/pages/advanced/npm_doppelgangers/) 問題，目前只能透過 PNPM 解決
+    :::
+
+### 2. 安全
+
+- **NPM** - 歸因 NPM 處理 Bad Packages 的方式，導致出現一些直接影響到專案的安全問題
+- **Yarn** - 有一套機制來阻擋惡意 Packages 並確保相依的完整性
+  - Yarn Classic (v1.x)
+    - 使用一個中央依賴項解析器，稱為 Yarn Resolution，來處理依賴項的解析和版本管理
+    - 用一個 lockfile（yarn.lock）來確定專案中各個依賴項的確切版本
+  - Yarn Berry (v2.x)
+    - 不再使用 lockfile 來管理依賴項
+    - 引入了一個稱為「Plug'n'Play」的策略，依賴項的解析和版本確定，
+      是通過專案中的 package.json 文件中的 dependencies 和 resolutions 字段來完成的
+    - 由於 Yarn Berry 不依賴 yarn.lock 文件，效驗碼的比對是通過計算 package.json 文件中 dependencies 和 resolutions 字段所列出的依賴項的校驗和（例如，使用 SHA-1 或其他哈希算法）。當你運行 yarn install 時，Yarn Berry 會檢查已下載的依賴項與 package.json 中的校驗和是否匹配，以確保依賴項的一致性和完整性
+- **PNPM** - 也會去驗證要執行之 package 的安全性
+  - 依賴項的版本信息是直接存儲在專案的 pnpm-lock.yaml 文件中，而不是像 yarn.lock 文件那樣生成在每個依賴項的文件夾中
+  - `pnpm install` 或其他相關命令時，計算每個依賴項的校驗和（Ex. SHA-1），並將其與 pnpm-lock.yaml 文件中存儲的校驗和進行比較
+    - 如果校驗和匹配，則表示依賴項的完整性得到了驗證，並且可以安全地使用
+    - 如果校驗和不匹配，則表示依賴項的內容可能已經被更改或損壞，pnpm 會提供相應的錯誤信息並停止安裝過程，以確保依賴項的一致性
+
+### 3. Monorepo 支援度
+
+- **NPM** - 提供了一些 CLI 指令來管理多個 packages，但缺乏如 workspaces 和 filtering 的功能
+- **Yarn** - 提供了 workspaces 的功能，在此功能出現前，只能透過 [Lerna](https://lerna.js.org/) 達成
+- **PNPM** - 也提供了 workspaces 的功能，且解決了在 Monorepo 中常產生困擾的 Doppelgangers 問題
+
+## 💡 知識補帖
+
+- **Cache**
+
+  - 高速緩存，位於 CPU 與主記憶體間的一種容量較小但速度很高的記憶體
+  - 因為 CPU 的速度遠高於主記憶體，CPU 直接從記憶體中存取數據會需要一些時間，
+    而 Cache 中保存著 CPU 剛從記憶體讀出來的某些數據，當 CPU 再次要使用這些數據時，
+    就可以直接從 Cache 使用，減少延遲，提升系統效率
+  - 過去 L1 Cache 直接焊在主機板上，現在的 L2 Cache 會被集結在 CPU 內部
+
+- **Hot Cache & Cold Cache**
+
+  - 用於描述快取利用效率，也就是即快取中當前存在多少相關資料
+  - **Hot Cache**
+    - 熱快取，意味快取中保存了經常訪問的資料或指令，也就是包含了與當前操作仍然相關的最近訪問的資訊
+  - **Cold Cache**
+    - 冷快取，意味著快取中不包含當前被處理器訪問或所需的資料或指令
+    - 在這種狀態下，快取缺乏所需的資訊，處理器需要從主記憶體或儲存設備中提取資料
+    - 從冷快取中訪問資料通常引入比從熱快取中訪問資料更多的延遲
+  - 確保快取保持「熱」狀態，即確保經常訪問的資料保留在快取中，可以顯著提高系統性能
+
+- **Buffer**
+
+  - 又被稱為【硬碟緩衝記憶體】、【緩衝區】、【快取記憶體】等等
+  - 一個用於 **存儲速度不同步的設備** 或 **優先級不同的設備** 之間傳輸數據的區域
+  - 過緩衝區，可以使進程之間的相互等待變少，從而使從速度慢的設備讀入數據時，速度快的設備的操作進程不發生間斷
+  - 用途和 CPU 中的 L1/L2 相同，透過先將資料放在速度快的緩衝記憶體中，
+    避免每次都要透過讀寫硬碟來獲得資料，主要就是加快硬碟的存取速度
+  - 一般硬體的讀取速度，會比記憶體 (類似於主機板的 DRAM) 慢很多，
+    如果那些需頻繁使用的資料，每次都要從硬體讀出寫入，就會讓整個資料的存取速度卡在硬碟上
+  - 大容量的 Buffer 可以增加讀取效率，降低對於硬碟的讀取速度，對於硬碟的壽命和性能也會有所幫助
+  - 目前主流的為 8MB，更新的有 16MB
+
+- **RAM**
+  - 代表隨機存取記憶體，提供儲存在電腦的資料，能在短期內快速存取的元件
+  - 電腦會將我們要求的程式或文件從硬體讀取到記憶體，在從記憶體汲取資訊
+  - 細分又可分為 DRAM 和 SRAM，適合不同用途
+    - DRAM (常見) - 動態隨機存取記憶體，動態來自於資料的不斷更新
+    - SRAM (貴) - 靜態隨機存取記憶體，靜態表示資訊不需要刷新

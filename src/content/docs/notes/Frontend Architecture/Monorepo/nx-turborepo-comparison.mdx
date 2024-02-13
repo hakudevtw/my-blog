@@ -1,0 +1,201 @@
+---
+title: Nx vs Turporepo
+description: Nx vs Turporepo
+sidebar:
+  badge:
+    text: 未整理
+---
+
+## 常見的專案架構
+
+### Monolith (Single-Repo Monolith)
+
+> 將所有的產品、功能都統一放在同一個 repository (簡稱 repo) 底下
+
+- 優點
+  - 快速發便建置專案
+- 缺點
+  - 專案不斷擴張的狀況下，repo 變得超級肥大，導致打包和部署時間長
+  - 不同團隊使用難以使用不同的技術，缺乏彈性，ex:news 團隊想要使用 react18，mail 團隊想要繼續使用 react16，pacakge 難以變動。
+- 範例圖
+  ![Monolith](https://hackmd.io/_uploads/ryfqWhlhh.png)
+
+### Multi-Repo
+
+> 專案各自進行版控放在不同的 Repository 中，個別產品、功能放在不同 repo 底下，各功能獨立不受影響
+
+- 優點
+  - 各產品擁有各自的環境和工具的設定檔與技術線
+- 缺點
+  - 資源不易共享，像是環境與設定檔重複配置 (CI/CD、webpack、test suite 等)
+  - 資源更新時，個別 repo 難以被通知而及時更新。
+  - 修理 bug 或是 i18n 字串更新時若涉及多個 repo，處理與測試的困難度也會變高。
+- 範例圖
+  ![](https://hackmd.io/_uploads/SJkiNhe32.png)
+
+### Monorepo
+
+- 定義
+  - 一個統一做版控的 Repository，而當中同時處理多個專案
+- 優點
+  - 能共享資源，程式碼易重複使用。
+  - 能共享配置，像是共享環境設定和 config 檔
+  - 簡化 Dependency 的管理，不用分開管理瑣碎的 modules 也因此比較不會產生版本之間的衝突
+  - 比較好確保專案品質、狀況的一致性
+  - 重大變化能迫使組別之間提早討論定好策略，並同步更新狀況
+  - 能確保 CI 的整合 (本來就放一起)，且可以使用同一套 CICD 流程
+- 缺點
+
+  - 隨著專案越來越大，效能會越來越差，開發時測試或是某些指令會需要比較長的時間
+  - 開發人員眾多時難以控管檔案權限
+  - 因為需同時處理多個不同的 Microservice，CICD 流程需要小心設定
+  - Master 壞掉會同時引響所有協作者，可被視為壞處，或是視為能夠確保測試的完善度且跟上版本
+  - 新人員會需要比較多時間理解整個專案結構才能進入專案開發
+  - 一天之中可能會有大量個資料修改和提交
+
+- 範例圖
+  ![](https://hackmd.io/_uploads/ByInS3e32.png)
+
+### 為什麼需要 Monorepo ?
+
+1. 多個項目需要共享相同的工作流程，而這些項目歸類於同一個場景，或是用來組合成一個大專案
+   - 常見的為，不同組別分別維護當中的不同專案，但使用相同的流程
+2. 項目之間有相互的依賴關係
+   - 避免如 【A & B 都用了 C】，當 C 升級時，需要分別手動更新 A 和 B
+
+## Monorepo 管理工具之分析
+
+:::warning
+使用 Monorepo 或 Multirepo，會大幅引響組織中的開發流程
+:::
+
+### Turborepo
+
+- 由 Vercel 團隊開發，講求高性能的建構系統，用於 JavaScript 和 TypeScript
+- 主要改善 Codebase 越來越大時，各種 Linting、測試、Building 等動作的加速
+- 優化方式
+  1. Multiple Running Task
+     - 盡可能讓 workspace 之間的 task (Ex. Build) 工作並行處理
+     - 提供可以定義 task 之間的依賴關係
+  2. 使用 Cache 和 Remote Cache
+
+#### Multiple Running Task
+
+- 假設 Monorepo 中有以下 Package
+  - apps/web，依賴 shared
+  - apps/docs，依賴 shared
+  - package/shared，被 web & docs 使用
+- 使用 yarn workspace 管理 monorepo 任務的常見 CI 任務流程為以下
+  ```shell
+  yarn workspaces run lint
+  yarn workspaces run test
+  yarn workspaces run build
+  ```
+  ![](https://hackmd.io/_uploads/SkYzH9bUn.png)
+  -> 需跑完 lint -> 才能跑 shared build
+  -> 接跑 web & docs 的 build -> 最後才能跑 test 結束
+  :::warning
+  隨著 Codebase 越來越大，任務流程的執行也會越來越慢
+  :::
+- Turborepo 優化的作法
+  1. 建立 `turbo.json` 來宣告 task 之間的依賴關係
+  ```json
+  {
+    "$schema": "https://turbo.build/schema.json",
+    "pipeline": {
+      "build": {
+        "outputs": [".next/**", "!.next/cache/**", ".svelte-kit/**"],
+        // ^build means `build` must be run in dependencies
+        // before it can be run in this workspace
+        "dependsOn": ["^build"]
+      },
+      "test": {},
+      "lint": {}
+    }
+  }
+  ```
+  2. 執行 `yarn lint test build`
+  3. 最後工作流程為以下，所有任務是已併行的方式處理的
+     ![](https://hackmd.io/_uploads/BkZiD5-82.png)
+
+#### Cache & Remote Cache
+
+- 由於每個任務都會在輸入後有一個輸出結果，所以可以對這個結果進行緩存
+  - 對於 build，Source Files 為輸入，而 build 出的東西就是輸出
+  - 對於 lint 和 test，Source Files 為輸入，而產出的 log 就是輸出
+- 第一次執行 `turbo run build` 時，Turborepo 會幫你產生緩存
+  ![](https://hackmd.io/_uploads/SyZIpqWI2.png)
+  第一次執行 build 所產生的 cache 會存在 `node_modules/.cache/turbo/*`
+- 下一次 build 的時候就會命中並使用緩存
+  ![](https://hackmd.io/_uploads/H1w5qhW8h.png)
+  build hash 如果在緩存目錄底下存在，表示命中
+  :::info
+  Hash 為 Turborepo 由 source files、環境變數、workspace source files 等等，
+  總和以上資訊雜湊出的結果 ( [Turborepo Hashing](https://link.juejin.cn/?target=https%3A%2F%2Fturborepo.org%2Fdocs%2Fcore-concepts%2Fcaching%23hashing) )
+  :::
+- Remote Cache 可以幫助在 CI 或團隊中共享這份緩存
+  - Remote Cache 前
+    ![](https://hackmd.io/_uploads/HylIpnZUn.png)
+  - Remote Cache 後
+    ![](https://hackmd.io/_uploads/HJeq62bU2.png)
+
+### Nx
+
+- 以 Monorepo 的支援為優先，擴充性強且快速
+- 和 Turborepo 一樣有自己的一套 Task Cache 機制
+  - 預設情況下，本地緩存會在一周後被清掉
+- Nx 團隊就是接手維護 lerna@5 的團隊，有引入 Nx
+
+#### 擴充性
+
+- 通過 plugins 可以制定自己的 code generater 和 task executor
+
+#### Code Generator
+
+- 能透過指令幫你建立一些 code，如下
+  ```bash
+  nx generate @nrwl/react:component mycomponent --project=myapp
+  ```
+  建立一個叫 myapp 的 monorepo，
+  並使用 `@nrwl/react:component` generator，生成 mycomponent 的 package
+- 也就意味我們可以自訂定義自己的模板
+
+#### Task Executor
+
+- nx 中的`target` 等同 Turborepo 中的 task，可以針對不同的 target 使用不同的 executor
+  ```json
+  {
+    "targets": {
+      "build": {
+        "executor": "@nrwl/web:webpack",
+        "options": {
+          "outputPath": "dist/apps/cart",
+          ...
+        },
+        "configurations": {
+          "production": {
+            "sourceMap": false,
+            ...
+          }
+        }
+      },
+      "test": {
+        "executor": "@nrwl/jest:jest",
+        "options": {
+          ...
+        }
+      }
+    }
+  }
+  ```
+
+## 其他 Monorepo 工具相關
+
+- [pnpm + workspace + changesets 构建你的 monorepo 工程](https://juejin.cn/post/7098609682519949325)
+- [Lerna](https://lerna.js.org/)
+
+#### 參考文章
+
+- https://juejin.cn/post/7144176452232020005
+- https://semaphoreci.com/blog/what-is-monorepo
+- https://www.cythilya.tw/2023/01/28/monolith-vs-multi-repo-vs-mono-repo/
