@@ -8,11 +8,6 @@ export default defineConfig({
   integrations: [
     starlight({
       title: `Haku の ノット`,
-      logo: {
-        light: "./src/assets/logo.webp",
-        dark: "./src/assets/logo.webp",
-        alt: "Haku Bear",
-      },
       social: {
         github: "https://github.com/withastro/starlight",
       },
